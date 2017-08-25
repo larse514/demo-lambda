@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: Demo Organization Api Assets
+
+Parameters:
+  StageName:
+    Description: Stage name
+    Type: String
+
+Resources:
+  DemoApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref StageName
+      DefinitionBody:
+        swagger: 2.0
+        info:
+          title: !Ref AWS::StackName
+        paths:
+          "/organizations":
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrganizationGetHandler.Arn}:${!stageVariables.env}/invocations
+              responses: {}
+
+  # Application assets
+  OrganizationGetHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: com.example.demo.OrganizationHandler
+      MemorySize: 512
+      Runtime: java8
+      CodeUri: build/distributions/demo-lambda.zip
+      Environment:
+        Variables:
+          DUMMY: Value
+      Events:
+        PostResource:
+          Type: Api
+          Properties:
+            RestApiId: !Ref DemoApiGateway
+            Path: /organizations
+            Method: get
+
+Outputs:
+  DemoApiGatewayRef:
+    Value: !Ref DemoApiGateway
+  OrganizationGetHandler:
+    Value: !GetAtt OrganizationGetHandler.Arn

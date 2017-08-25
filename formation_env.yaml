@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Demo Organization Api Environment Assets
+
+Parameters:
+  ApiGateway:
+    Description: Ref of API Gateway
+    Type: String
+  StageName:
+    Description: Deployment stage for API Gateway
+    Type: String
+  DeploymentId:
+    Description: Current Deployment Id
+    Type: String
+  Version:
+    Description: Deployment version number
+    Type: String
+
+Resources:
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: !Ref StageName
+      RestApiId: !Ref ApiGateway
+      DeploymentId: !Ref DeploymentId
+      Variables:
+        env: !Ref StageName
+      MethodSettings:
+        - DataTraceEnabled: true
+          HttpMethod: "*"
+          LoggingLevel: INFO
+          ResourcePath: "/*"
+          MetricsEnabled: true
+
+<% functions.each { %>
+  ${it.name.tokenize(':')[6].replace('-', '')}Alias:
+    Type: AWS::Lambda::Alias
+    Properties:
+      FunctionName: ${it.name}
+      FunctionVersion: ${it.version}
+      Name: !Ref StageName
+
+  ${it.name.tokenize(':')[6].replace('-', '')}InvokePermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - ${it.name.tokenize(':')[6].replace('-', '')}Alias
+    Properties:
+      Action: lambda:invokeFunction
+      Principal: apigateway.amazonaws.com
+      FunctionName: !Sub ${it.name}:${'${StageName}'}
+      SourceArn: !Sub arn:aws:execute-api:${'${AWS::Region}'}:${'${AWS::AccountId}'}:${'${ApiGateway}'}/${'${StageName}'}/*
+<% } %>
